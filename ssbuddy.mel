@@ -1,0 +1,94 @@
+{
+
+global vector $curvePoints[];
+global string $cv = "";
+
+proc readInputPoints(){
+    string $pointString = `falloffCurve -q -as $cv`;
+    string $tkn[];
+    tokenize ($pointString,",",$tkn);
+    clear($curvePoints);
+    for ($i=0; $i<size($tkn)/2; $i++) {
+        $curvePoints[$i] = <<(float)$tkn[$i*2], (float)$tkn[$i*2+1], 0.0>>;
+    }
+
+}
+
+proc vector newDeBoor(float $x, float $t[], vector $c[]){
+    $p = 3;
+    $k = 0;
+    for($i = 0; $i < size($t)-1; $i++){
+        if($t[$i]!=$t[$i+1] && $t[$i] <= $x && $t[$i+1] >= $x){
+            $k = $i;
+        }
+    }
+    vector $d[];
+    for ($j=0; $j<$p+1; $j++) {
+        $d[$j] = $c[$j+$k-$p];
+    }
+    for ($r = 1; $r < $p+1; $r++) {
+        for($j = $p; $j>$r-1; $j--){
+            $alpha = ($x - $t[$j+$k-$p]) / ($t[$j+1+$k-$r] - $t[$j+$k-$p]);
+            $d[$j] = (1.0 - $alpha) * $d[$j-1] + $alpha * $d[$j];
+        }
+    }
+    return $d[$p];
+
+}
+
+proc evalNurbs(){
+    readInputPoints();
+    vector $inputPoints[] = $curvePoints;
+    float $knots[];
+    clear($knots);
+    //Knots
+    $knots[0] = 0;
+    $knots[1] = 0;
+    for($i = 0; $i < size($inputPoints)-2;$i++){
+        $knots[$i+3] = $i;
+    }
+
+    $knots[size($knots)] = $i-1;
+    $knots[size($knots)] = $i-1;
+    $knots[size($knots)] = $i-1;
+    $sscString = "softSelect -ssc \"";
+    float $x;
+    float $lastX = -1.0;
+    $maxval = $knots[size($knots)-1];
+    for ($i = 0; $i <= 20; $i++) {
+        $x = ($maxval/20.0)*$i;
+
+        vector $fp = newDeBoor($x, $knots, $inputPoints);
+
+        if($fp.x > $lastX){
+            $lastX = $fp.x;
+            $sscString+=$fp.y;
+            $sscString+=",";
+            $sscString+=$fp.x;
+            $sscString+=",1,";
+        }
+    }
+
+    $sscString = substring($sscString,1,size($sscString)-1);
+    $sscString += "\"";
+    eval($sscString);
+}
+
+proc buildWindow(){
+    window -title "Better Soft Selector";
+    columnLayout;
+    $cv = `falloffCurve -h 300 -w 300 -cc "evalNurbs()"`;
+    showWindow;
+};
+
+proc testTiming(){
+    timer -s;
+    for ($i = 0; $i < 100; $i++) {
+        evalNurbs();
+    }
+    print(`timer -e`);
+}
+
+buildWindow();
+testTiming();
+}
