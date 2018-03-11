@@ -3,7 +3,9 @@
 global vector $curvePoints[];
 global string $cv = "";
 
-proc readInputPoints(){
+proc SSB.readInputPoints(){
+    //Reads points from curve widget and puts them into $curvePoints
+
     string $pointString = `falloffCurve -q -as $cv`;
     string $tkn[];
     tokenize ($pointString,",",$tkn);
@@ -14,14 +16,19 @@ proc readInputPoints(){
 
 }
 
-proc vector newDeBoor(float $x, float $t[], vector $c[]){
-    $p = 3;
-    $k = 0;
+proc vector SSB.deBoor(float $x, float $t[], vector $c[]){
+    //Evaluates DeBoor's algorithm for B-spline curves
+
+    $p = 3; //Degree
+    $k = 0; //Knot span
+
+    //Find knot span
     for($i = 0; $i < size($t)-1; $i++){
         if($t[$i]!=$t[$i+1] && $t[$i] <= $x && $t[$i+1] >= $x){
             $k = $i;
         }
     }
+
     vector $d[];
     for ($j=0; $j<$p+1; $j++) {
         $d[$j] = $c[$j+$k-$p];
@@ -36,21 +43,22 @@ proc vector newDeBoor(float $x, float $t[], vector $c[]){
 
 }
 
-proc evalNurbs(){
-    readInputPoints();
+proc SSB.evalNurbs(){
+    SSB.readInputPoints();
     vector $inputPoints[] = $curvePoints;
     float $knots[];
     clear($knots);
+
     //Knots
     $knots[0] = 0;
     $knots[1] = 0;
     for($i = 0; $i < size($inputPoints)-2;$i++){
-        $knots[$i+3] = $i;
+        $knots[$i+2] = $i;
     }
+    $knots[size($knots)] = $i-1;
+    $knots[size($knots)] = $i-1;
 
-    $knots[size($knots)] = $i-1;
-    $knots[size($knots)] = $i-1;
-    $knots[size($knots)] = $i-1;
+
     $sscString = "softSelect -ssc \"";
     float $x;
     float $lastX = -1.0;
@@ -58,8 +66,9 @@ proc evalNurbs(){
     for ($i = 0; $i <= 20; $i++) {
         $x = ($maxval/20.0)*$i;
 
-        vector $fp = newDeBoor($x, $knots, $inputPoints);
+        vector $fp = SSB.deBoor($x, $knots, $inputPoints);
 
+        //Handle non-X monotone curves
         if($fp.x > $lastX){
             $lastX = $fp.x;
             $sscString+=$fp.y;
@@ -69,19 +78,19 @@ proc evalNurbs(){
         }
     }
 
-    $sscString = substring($sscString,1,size($sscString)-1);
+    $sscString = substring($sscString,1,size($sscString)-1); //Trim trailing comma
     $sscString += "\"";
     eval($sscString);
 }
 
-proc buildWindow(){
+proc SSB.buildWindow(){
     window -title "Better Soft Selector";
     columnLayout;
     $cv = `falloffCurve -h 300 -w 300 -cc "evalNurbs()"`;
     showWindow;
 };
 
-proc testTiming(){
+proc SSB.testTiming(){
     timer -s;
     for ($i = 0; $i < 100; $i++) {
         evalNurbs();
@@ -89,6 +98,5 @@ proc testTiming(){
     print(`timer -e`);
 }
 
-buildWindow();
-testTiming();
+SSB.buildWindow();
 }
