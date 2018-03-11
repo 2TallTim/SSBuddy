@@ -84,7 +84,7 @@ proc SSB.evalNurbs(){
 }
 
 proc SSB.buildWindow(){
-    window -title "Better Soft Selector";
+    window -title "Better Soft Selector" -mxb false -rtf true;
     columnLayout;
     $cv = `falloffCurve -h 300 -w 300 -cc "evalNurbs()"`;
     showWindow;
