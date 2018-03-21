@@ -3,6 +3,10 @@
 global vector $curvePoints[];
 global string $cv = "";
 
+//
+// Curve Evaluation Procs
+//
+
 proc SSB.readInputPoints(){
     //Reads points from curve widget and puts them into $curvePoints
 
@@ -14,7 +18,7 @@ proc SSB.readInputPoints(){
         $curvePoints[$i] = <<(float)$tkn[$i*2], (float)$tkn[$i*2+1], 0.0>>;
     }
 
-}
+};
 
 proc vector SSB.deBoor(float $x, float $t[], vector $c[]){
     //Evaluates DeBoor's algorithm for B-spline curves
@@ -41,7 +45,7 @@ proc vector SSB.deBoor(float $x, float $t[], vector $c[]){
     }
     return $d[$p];
 
-}
+};
 
 proc SSB.evalNurbs(){
     SSB.readInputPoints();
@@ -83,12 +87,72 @@ proc SSB.evalNurbs(){
     $sscString = substring($sscString,1,size($sscString)-1); //Trim trailing comma
     $sscString += "\"";
     eval($sscString);
-}
+};
+
+//
+// UI Procedures
+//
 
 proc SSB.buildWindow(){
-    columnLayout;
-    $cv = `falloffCurve -h 300 -w 300 -cc "SSV.evalNurbs()"`;
+    rowColumnLayout -numberOfColumns 2 
+                    -columnSpacing 2 5
+                    -rowSpacing 1 1
+                    -columnAttach 1 "right" 0
+                    -columnWidth 1 125
+                    -columnAttach 2 "left" 0
+                    -adjustableColumn 2;
+            text -label "Soft Select:" -al "right";
+            rowLayout -numberOfColumns 2 
+                      -columnAlign 1 "left" 
+                      -columnAlign 2 "center" 
+                      -adjustableColumn 1;
+                checkBox -label ""
+                         -onCommand "softSelect -sse 1"
+                         -offCommand "softSelect -sse 0";
+                button -label "Reset"
+                       -command "softSelect -ssr";
+            setParent ..;
+
+            text -label "Falloff mode:" -al "right";
+            rowLayout;
+                optionMenu -changeCommand "SSB.changeFalloffMode(\"#1\")";
+                    menuItem -label "Volume" -data 0;
+                    menuItem -label "Surface" -data 1;
+                    menuItem -label "Global" -data 2;
+                    menuItem -label "Object" -data 3;
+            setParent ..;
+            text -label "Falloff radius:" -al "right";
+            floatSliderGrp -field true 
+                           -minValue 0.0 
+                           -maxValue 100.0
+                           -changeCommand "SSB.changeFalloffRadius(\"#1\")";
+            text -label "Falloff Curve:" -al "right";
+            $cv = `falloffCurve -h 200 -cc "SSB.evalNurbs()"`;
 };
+
+proc SSB.changeFalloffMode(string $m){
+    int $mode = -1;
+    switch($m){
+        case "Volume":
+            $mode = 0;
+            break;
+        case "Surface":
+            $mode = 1;
+            break;
+        case "Global":
+            $mode = 2;
+            break;
+        case "Object":
+            $mode = 3;
+            break;
+    }
+    
+    softSelect -ssf $mode;
+};
+
+proc SSB.changeFalloffRadius(int $r){
+    softSelect -ssd $r;
+}
 
 proc SSB.testTiming(){
     timer -s;
@@ -96,10 +160,11 @@ proc SSB.testTiming(){
         evalNurbs();
     }
     print(`timer -e`);
-}
+};
+
 if(`workspaceControl -exists "SSB"`){
     deleteUI "SSB";
-}
+};
 workspaceControl -ui "SSB.buildWindow()" -li true "SSB";
 
 }
